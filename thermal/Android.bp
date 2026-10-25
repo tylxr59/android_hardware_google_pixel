@@ -82,7 +82,6 @@ cc_test {
     name: "libthermaltest",
     vendor: true,
     srcs: [
-        "service.cpp",
         "Thermal.cpp",
         "thermal-helper.cpp",
         "utils/thermal_throttling.cpp",
@@ -95,6 +94,7 @@ cc_test {
         "utils/thermal_watcher.cpp",
         "tests/mock_thermal_helper.cpp",
         "tests/thermal_looper_test.cpp",
+        "tests/thermal_api_test.cpp",
         "virtualtemp_estimator/virtualtemp_estimator.cpp",
     ],
     shared_libs: [
@@ -116,7 +116,7 @@ cc_test {
         "libpixelstats",
     ],
     test_suites: ["device-tests"],
-    require_root: true,
+    require_root: false,
 }
 
 sh_binary {

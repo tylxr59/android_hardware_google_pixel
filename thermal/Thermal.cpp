@@ -18,6 +18,8 @@
 
 #include "Thermal.h"
 
+#include <algorithm>
+
 #include <android-base/file.h>
 #include <android-base/logging.h>
 #include <utils/Trace.h>
@@ -38,6 +40,21 @@ ndk::ScopedAStatus initErrorStatus() {
 ndk::ScopedAStatus readErrorStatus() {
     return ndk::ScopedAStatus::fromExceptionCodeWithMessage(
             EX_ILLEGAL_STATE, "ThermalHal cannot read any sensor data");
+}
+
+// Empty type queries are valid; configured devices that fail to read are not.
+bool hasSensor(const ThermalHelper &helper, bool filterType, TemperatureType type) {
+    const auto &sensors = helper.GetSensorInfoMap();
+    return std::any_of(sensors.begin(), sensors.end(), [filterType, type](const auto &entry) {
+        return !entry.second.is_hidden && (!filterType || entry.second.type == type);
+    });
+}
+
+bool hasCoolingDevice(const ThermalHelper &helper, bool filterType, CoolingType type) {
+    const auto &devices = helper.GetCdevInfoMap();
+    return std::any_of(devices.begin(), devices.end(), [filterType, type](const auto &entry) {
+        return !filterType || entry.second.type == type;
+    });
 }
 
 bool interfacesEqual(const std::shared_ptr<::ndk::ICInterface> left,
@@ -74,6 +91,9 @@ ndk::ScopedAStatus Thermal::getFilteredTemperatures(bool filterType, Temperature
     if (!thermal_helper_->isInitializedOk()) {
         return initErrorStatus();
     }
+    if (!hasSensor(*thermal_helper_, filterType, type)) {
+        return ndk::ScopedAStatus::ok();
+    }
     if (!thermal_helper_->fillCurrentTemperatures(filterType, false, type, _aidl_return)) {
         return readErrorStatus();
     }
@@ -94,6 +114,9 @@ ndk::ScopedAStatus Thermal::getFilteredCoolingDevices(bool filterType, CoolingTy
     *_aidl_return = {};
     if (!thermal_helper_->isInitializedOk()) {
         return initErrorStatus();
+    }
+    if (!hasCoolingDevice(*thermal_helper_, filterType, type)) {
+        return ndk::ScopedAStatus::ok();
     }
     if (!thermal_helper_->fillCurrentCoolingDevices(filterType, type, _aidl_return)) {
         return readErrorStatus();
@@ -117,6 +140,9 @@ ndk::ScopedAStatus Thermal::getFilteredTemperatureThresholds(
     *_aidl_return = {};
     if (!thermal_helper_->isInitializedOk()) {
         return initErrorStatus();
+    }
+    if (!hasSensor(*thermal_helper_, filterType, type)) {
+        return ndk::ScopedAStatus::ok();
     }
     if (!thermal_helper_->fillTemperatureThresholds(filterType, type, _aidl_return)) {
         return readErrorStatus();
